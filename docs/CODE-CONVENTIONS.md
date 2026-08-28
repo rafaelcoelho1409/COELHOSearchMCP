@@ -210,10 +210,13 @@ Phase order is deliberate — each step is additive and testable.
 4. Append `exa` to `router.py` provider list (Tavily first, Exa second).
 5. Add `EXA_API_KEY` → `exa-api-key` to `secretMappings`.
 
-### Phase 3B — Jina provider (news/sReader + search)
-1. `providers/jina/` (`config.py` key `JINA_API_KEY`, `service.py`, `domain.py`).
-2. Use Jina Reader / search endpoints; map errors → `ProviderQuotaExceeded`.
-3. Append to router; extend `secretMappings`.
+### Phase 3B — Jina provider (news/sReader + search) ✅
+1. `providers/jina/` (`config.py` key `JINA_API_KEY`, `service.py` — `JinaClient`
+   + `JinaAdapter` POST to `s.jina.ai/`, `domain.py` — **plain-text markdown
+   parser**). Note: s.jina.ai returns numbered `[N] Title/URL Source/...` blocks
+   in markdown, NOT JSON; `domain.parse_results` extracts blocks via regex.
+2. Map `429`/`401`/`402`/`403` → `ProviderQuotaExceeded`; append to router.
+3. Free tier = 100 RPM, ~10k tokens/search, no queryable balance (credits=None).
 
 ### Phase 3C — Linkup provider (deep research)
 1. `providers/linkup/` (`config.py` key `LINKUP_API_KEY`, ...).
