@@ -17,8 +17,8 @@ import sys
 from pathlib import Path
 
 DEFAULT_ENV_FILE = ".env"
-DEFAULT_NAMESPACE = "coelhonexus"
-DEFAULT_SECRET_NAME = "coelhonexus-secret"
+DEFAULT_NAMESPACE = "coelho-search-mcp"
+DEFAULT_SECRET_NAME = "coelho-search-mcp-secret"
 BASE64_PROBE_MIN_LEN = 20
 
 

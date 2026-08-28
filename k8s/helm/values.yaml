@@ -1,5 +1,24 @@
 environment: production
 
+# Loaded from Kubernetes Secret by the upload_env_to_k3d.py Script
+# (default secret name: coelho-search-mcp-secret, namespace: coelho-search-mcp).
+secretName: coelho-search-mcp-secret
+
+# Maps each provider's API key secret key -> the env var the FastMCP process
+# reads. Provider adapters read these env vars via their frozen-dataclass
+# config (e.g. TavilyConfig reads TAVILY_API_KEY). `optional: true` means the
+# chart still deploys cleanly when a given key isn't populated yet — the
+# provider then runs keyless or is unavailable until the key is added.
+secretMappings:
+  - envName: TAVILY_API_KEY
+    key: tavily-api-key
+  - envName: EXA_API_KEY
+    key: exa-api-key
+  - envName: JINA_API_KEY
+    key: jina-api-key
+  - envName: LINKUP_API_KEY
+    key: linkup-api-key
+
 
 fastmcp:
   image: localhost:5001/coelho-search-mcp-fastmcp:latest

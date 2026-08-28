@@ -1,4 +1,4 @@
-"""COELHO Nexus — FastMCP server. Registers all domain tools and exposes the Streamable-HTTP ASGI app."""
+"""COELHO Search MCP — FastMCP server. Registers all domain tools and exposes the Streamable-HTTP ASGI app."""
 import logging
 import os
 
@@ -9,7 +9,11 @@ from fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from domains.search import server as search
+
 mcp = FastMCP("coelho-search-mcp-fastmcp")
+
+search.register(mcp)
 
 
 @mcp.tool
