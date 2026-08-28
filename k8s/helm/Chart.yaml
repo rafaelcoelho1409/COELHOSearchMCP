@@ -1,0 +1,9 @@
+apiVersion: v2
+name: coelho-search-mcp
+description: COELHO Search MCP
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+
+dependencies: []

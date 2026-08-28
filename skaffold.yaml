@@ -1,0 +1,102 @@
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: coelho-search-mcp
+
+build:
+  # Content-based tag: hashes the build context, so the tag changes whenever
+  # source files change. This guarantees:
+  #   1. Skaffold rebuilds when sources change (new tag => cache miss)
+  #   2. Kubernetes detects image change and rolls out a new pod (tag differs)
+  #   3. tryImportMissing can't accidentally pull a stale 'latest' from registry
+  #      because the tag itself is unique per content snapshot.
+  # Identical builds reuse cache (same tag), so this stays fast.
+  tagPolicy:
+    sha256: {}
+  artifacts:
+    # FastMCP server (Model Context Protocol tool surface — apps/fastmcp).
+    # Internal/ClusterIP MCP gateway consumed by the fastapi Research Radar
+    # agent. Same fully-qualified-image + all-or-nothing sync pattern as above.
+    - image: localhost:5001/coelho-search-mcp-fastmcp
+      context: apps/fastmcp
+      docker:
+        dockerfile: Dockerfile.fastmcp
+        noCache: false
+      sync:
+        manual:
+          - src: "**/*.py"
+            dest: /app
+          - src: "**/*.yaml"
+            dest: /app
+          - src: "**/*.yml"
+            dest: /app
+          - src: "**/*.json"
+            dest: /app
+          - src: "**/*.toml"
+            dest: /app
+  local:
+    # Push to the k3d registry at localhost:5001 (k3d host port). Whichever
+    # cluster this targets resolves the SAME address via its own containerd
+    # mirror (registries.yaml.tpl in infrastructure/modules/k3d/), so
+    # `localhost:5001/foo:bar` works as a single image name end-to-end —
+    # host pushes there, kubelet pulls from there. Single source of truth,
+    # Skaffold's sync matcher matches, hot-reload works.
+    push: true
+    # IMPORTANT: tryImportMissing=false forces Skaffold to always build from
+    # source. With true, Skaffold would silently import an existing image with
+    # the same name+tag from the registry — which masked code changes when
+    # combined with the old 'latest' tag policy. Combined with sha256 tags
+    # above, this guarantees every build reflects current source code.
+    tryImportMissing: false
+    useBuildkit: true
+    useDockerCLI: true
+
+# MANIFESTS (v4beta13 structure)
+manifests:
+  helm:
+    releases:
+      - name: coelho-search-mcp
+        chartPath: ./k8s/helm
+        namespace: coelho-search-mcp-dev
+        createNamespace: true
+        skipBuildDependencies: true
+        # Enable Skaffold image tracking for hot-reload sync.
+        #
+        # IMAGE_FULLY_QUALIFIED_<name> = "<artifact-image>:<sha256-tag>".
+        # Variable name uses the artifact image with non-alphanumerics
+        # replaced by underscores — so `localhost:5001/coelho-search-mcp-fastapi`
+        # becomes `localhost_5001_coelho_search_mcp_fastapi`.
+        #
+        # The pod's deployed image string equals what Skaffold pushed
+        # (no rewrite), so Skaffold's sync matcher finds the pod and
+        # hot-reload works. The cluster's containerd mirror handles
+        # `localhost:5001` → in-cluster registry transparently.
+        setValueTemplates:
+          fastmcp.image: "{{.IMAGE_FULLY_QUALIFIED_localhost_5001_coelho_search_mcp_fastmcp}}"
+          environment: local  # Enables --reload in uvicorn for hot-reload
+
+deploy:
+  helm:
+    flags:
+      install:
+        - --timeout=10m
+        - --wait
+      upgrade:
+        - --timeout=10m
+        - --wait
+
+portForward:
+  # FastMCP server
+  - resourceType: service
+    resourceName: coelho-search-mcp-fastmcp
+    namespace: coelho-search-mcp-dev
+    port: 8001
+    localPort: 23030
+    address: 0.0.0.0
+
+
+# NOTE: Ensure docker-buildx is installed when useBuildkit is true
+
+# Development (Skaffold): ports 23030-23039
+# sh mirror_localhost_tailscale.sh $(for i in {23030..23034}; do echo $i; done)
+# skaffold dev --cache-artifacts=false --no-prune=false --auto-sync=false --auto-build=false

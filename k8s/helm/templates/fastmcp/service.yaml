@@ -1,0 +1,5 @@
+{{- $appName := "fastmcp" -}}
+
+apiVersion: v1
+{{- include "coelho-search-mcp.ServiceSettings" (dict "appName" $appName "root" .) | nindent 0 }}
+{{- include "coelho-search-mcp.ServicePortsSettings" (dict "appName" $appName "root" .) }}

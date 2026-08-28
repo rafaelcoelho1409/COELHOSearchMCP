@@ -1,0 +1,10 @@
+{{- $appName := "fastmcp" -}}
+{{- $appConfig := index $.Values $appName }}
+
+apiVersion: apps/v1
+{{- include "coelho-search-mcp.DeploymentSettings" (dict "appName" $appName "root" .) | nindent 0 }}
+spec:
+  replicas: {{ $appConfig.replicas }}
+{{- include "coelho-search-mcp.DeploymentSpecSettings" (dict "appName" $appName "root" .) | nindent 2 }}
+{{- include "coelho-search-mcp.DeploymentResources" (dict "appName" $appName "root" .) | nindent 10}}
+{{- include "coelho-search-mcp.ProbeSettings" (dict "appName" $appName "root" .) | nindent 10 }}
