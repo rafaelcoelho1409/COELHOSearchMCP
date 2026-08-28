@@ -3,6 +3,6 @@
 Each provider is a Ports & Adapters implementation of `BaseSearchProvider`.
 Import the published singleton (e.g. `from .providers.tavily import tavily`).
 """
-from . import exa, jina, tavily  # noqa: F401
+from . import exa, jina, linkup, tavily  # noqa: F401
 
-__all__ = ["tavily", "exa", "jina"]
+__all__ = ["tavily", "exa", "jina", "linkup"]

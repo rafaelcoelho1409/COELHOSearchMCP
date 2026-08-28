@@ -218,9 +218,14 @@ Phase order is deliberate — each step is additive and testable.
 2. Map `429`/`401`/`402`/`403` → `ProviderQuotaExceeded`; append to router.
 3. Free tier = 100 RPM, ~10k tokens/search, no queryable balance (credits=None).
 
-### Phase 3C — Linkup provider (deep research)
-1. `providers/linkup/` (`config.py` key `LINKUP_API_KEY`, ...).
-2. Map its quota → `ProviderQuotaExceeded`; append to router.
+### Phase 3C — Linkup provider (deep research) ✅
+1. `providers/linkup/` (`config.py` key `LINKUP_API_KEY`, `service.py` —
+   `LinkupClient` POST to `/v1/search`, `domain.py` — normalizes both
+   `searchResults` and `sourcedAnswer` shapes).
+2. Honours `include_answer`: `sourcedAnswer` (answer + sources) when requested,
+   else `searchResults` — Tavily-parity on answer summaries.
+3. Map 402/429 → `ProviderQuotaExceeded`; free tier, no queryable balance
+   (credits=None).
 
 ### Phase 3D — RRF merge (optional, cross-provider quality)
 - If/when you want multi-provider merges (not just failover), add Reciprocal Rank
