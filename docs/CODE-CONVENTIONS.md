@@ -304,6 +304,20 @@ API-cost version of Argus's Deep Hybrid Rank).
    (credits=None).
 4. Append `firecrawl` to the router (7th: tavily, exa, jina, linkup, you, serper, firecrawl).
 
+### Phase 3H — SerpApi provider (Google SERP + answer_box) ✅
+1. `providers/serpapi/` (`config.py` key `SERPAPI_API_KEY`, `service.py` —
+   `SerpApiClient` + `SerpApiAdapter` GET to `https://serpapi.com/search.json`
+   with `api_key` query param + `q`, `engine=google`, `num` params, `domain.py` —
+   normalizes `organic_results[]` to `SearchResult` and pulls optional
+   `answer_box` into `answer`).
+2. Adds a second Google-index source the pool (alongside Serper). Free tier =
+   250 searches/month, no card, recurring; optional `answer_box` → Tavily/Serper
+   answer parity. Combined Google volume: Serper 2,500 + SerpApi 250 = 2,750/mo.
+3. Map `429`/`402`/`403` → `ProviderQuotaExceeded`; no live balance endpoint
+   (credits=None; Account API available but burns a search call).
+4. Append `serpapi` to the router (8th: tavily, exa, jina, linkup, you, serper,
+   firecrawl, serpapi).
+
 ### Phase 4 — Quota observability
 1. `usage` tool already queries `/usage` (rate-limited 10/10min) — add caching so
    hot loops don't burn the usage endpoint's own rate limit.

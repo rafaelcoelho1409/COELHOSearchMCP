@@ -19,6 +19,7 @@ from .providers.exceptions import ProviderQuotaExceeded
 from .providers.firecrawl import firecrawl
 from .providers.jina import jina
 from .providers.linkup import linkup
+from .providers.serpapi import serpapi
 from .providers.serper import serper
 from .providers.tavily import tavily
 from .providers.you import you
@@ -126,5 +127,5 @@ class SearchRouter:
         return None
 
 
-# Default router: Tavily, Exa, Jina, Linkup, You, Serper, Firecrawl.
-router = SearchRouter([tavily, exa, jina, linkup, you, serper, firecrawl])
+# Default router: Tavily, Exa, Jina, Linkup, You, Serper, Firecrawl, SerpApi.
+router = SearchRouter([tavily, exa, jina, linkup, you, serper, firecrawl, serpapi])
