@@ -18,22 +18,22 @@ from __future__ import annotations
 import logging
 import time
 
-from .bandit import BanditService, get_or_create
-from .bandit.domain import compose_reward, make_context_vector
-from .bandit.params import EXPECTED_LATENCY_S
+from .core.bandit import BanditService, get_or_create
+from .core.bandit.domain import compose_reward, make_context_vector
+from .core.bandit.params import EXPECTED_LATENCY_S
 from .fusion import dedup, normalize_result, rrf_fuse, tidiness_score
-from .providers.base import BaseSearchProvider
-from .providers.exa import exa
-from .providers.exceptions import ProviderQuotaExceeded
-from .providers.firecrawl import firecrawl
-from .providers.geekflare import geekflare
-from .providers.jina import jina
-from .providers.linkup import linkup
-from .providers.serpapi import serpapi
-from .providers.serper import serper
-from .providers.tavily import tavily
-from .providers.tinyfish import tinyfish
-from .providers.you import you
+from .core.providers.base import BaseSearchProvider
+from .core.providers.exa import exa
+from .core.providers.exceptions import ProviderQuotaExceeded
+from .core.providers.firecrawl import firecrawl
+from .core.providers.geekflare import geekflare
+from .core.providers.jina import jina
+from .core.providers.linkup import linkup
+from .core.providers.serpapi import serpapi
+from .core.providers.serper import serper
+from .core.providers.tavily import tavily
+from .core.providers.tinyfish import tinyfish
+from .core.providers.you import you
 from .schemas import SearchInput, SearchResponse
 
 

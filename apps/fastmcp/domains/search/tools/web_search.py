@@ -14,7 +14,7 @@ from __future__ import annotations
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 
-from ..providers.exceptions import ProviderQuotaExceeded
+from ..core.providers.exceptions import ProviderQuotaExceeded
 from ..router import router
 from ..schemas import SearchInput, SearchResponse
 
