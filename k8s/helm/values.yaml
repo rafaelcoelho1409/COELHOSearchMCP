@@ -20,6 +20,8 @@ secretMappings:
     key: linkup-api-key
   - envName: YOUCOM_API_KEY
     key: youcom-api-key
+  - envName: SERPER_API_KEY
+    key: serper-api-key
 
 
 fastmcp:

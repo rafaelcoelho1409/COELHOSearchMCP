@@ -18,6 +18,7 @@ from .providers.exa import exa
 from .providers.exceptions import ProviderQuotaExceeded
 from .providers.jina import jina
 from .providers.linkup import linkup
+from .providers.serper import serper
 from .providers.tavily import tavily
 from .providers.you import you
 from .schemas import SearchInput, SearchResponse
@@ -124,5 +125,5 @@ class SearchRouter:
         return None
 
 
-# Default router: Tavily first, then Exa, Jina, Linkup, You.com (all free tiers wired).
-router = SearchRouter([tavily, exa, jina, linkup, you])
+# Default router: Tavily first, then Exa, Jina, Linkup, You.com, Serper.
+router = SearchRouter([tavily, exa, jina, linkup, you, serper])

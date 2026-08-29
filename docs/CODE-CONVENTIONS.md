@@ -279,6 +279,18 @@ API-cost version of Argus's Deep Hybrid Rank).
    no live balance endpoint (credits=None).
 4. Append `you` to the router (5th in priority: tavily, exa, jina, linkup, you).
 
+### Phase 3F — Serper provider (Google SERP index) ✅
+1. `providers/serper/` (`config.py` key `SERPER_API_KEY`, `service.py` —
+   `SerperClient` + `SerperAdapter` POST to `https://google.serper.dev/search`
+   with `X-API-KEY` + `{"q", "num"}` body, `domain.py` — normalizes `organic[]`
+   to `SearchResult` and pulls optional `answerBox` into `answer`).
+2. Adds a GOOGLE-index source the pool otherwise lacks (Tavily/You are
+   independent; Exa semantic; Jina/Linkup niche). Free tier = 2,500
+   searches/month, no card; optional `answerBox` → Tavily/Serper answer parity.
+3. Map `429`/`402`/`403` → `ProviderQuotaExceeded`; no live balance endpoint
+   (credits=None).
+4. Append `serper` to the router (6th: tavily, exa, jina, linkup, you, serper).
+
 ### Phase 4 — Quota observability
 1. `usage` tool already queries `/usage` (rate-limited 10/10min) — add caching so
    hot loops don't burn the usage endpoint's own rate limit.
