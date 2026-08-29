@@ -359,7 +359,22 @@ API-cost version of Argus's Deep Hybrid Rank).
    via a resource (`search://usage`) — feeds the router's budgeting so it can
    prefer the provider with most remaining credits.
 
-### Phase 5 — Hardening
+### Phase 5 — SOTA routing algorithm (FGTS-VA lineage) — design in `docs/ROUTING.md`, `docs/QUOTA.md`
+Router order is now **quality-first, recurring-before-one-time** (see
+`router.py` + both docs). Closing the SOTA gaps from the deep research:
+1. **Circuit breaker** — CLOSED/OPEN/HALF-OPEN per provider (trip ~5 failures,
+   ~60s cooldown, 1 probe) — replaces cooldown-only. THE fail-fast core.
+2. **Sliding-window / discounted reward forgetting** — SW-TS or discounted TS so
+   an abrupt breakpoint (quota hit/outage) demotes an arm fast (non-stationary).
+3. **BwK budget pre-filter** — exclude arms with `remaining <= 0` from
+   `available()` before bandit scoring (track per-provider budget from
+   `docs/QUOTA.md`, live balance where available).
+4. **Answer-aware path** — `include_answer=True` → Linkup → You → Tavily →
+   Geekflare (= answer-capable + recurring).
+5. **Intent/freshness** — freshness-sensitive queries prefer live-web
+   (Linkup/You/Tavily/Geekflare), NOT Exa (weak freshness).
+
+### Phase 6 — Hardening
 - Request timeouts per provider (already in configs), semaphore-bounded concurrency,
   per-result `ok`/`error` tagging, dedupe across providers, `Retry-After` honoring.
 
@@ -377,3 +392,9 @@ API-cost version of Argus's Deep Hybrid Rank).
   your component registry" (the SOTA organization this repo mirrors).
 - **OmniRoute / Argus (2026):** priority routing + fail-fast + cooldown + (later) RRF
   — the router design this repo implements.
+- **FGTS-VA — Variance-Aware Feel-Good Thompson Sampling** (Li & Gu, NeurIPS 2025,
+  arXiv:2511.02123) — the contextual bandit the quality-router builds on.
+- **Bandits with Knapsacks (Badanidiyuru et al.)** — quota-as-constraint pre-filter.
+- **Garivier & Moulines (2011)** — sliding-window/discounted UCB/TS for non-stationary arms.
+- **AIMultiple search-API benchmark + SimpleQA/FreshQA (Aug 2026)** — provider quality
+  and freshness evidence used to order the roster (see `docs/QUOTA.md`, `docs/ROUTING.md`).

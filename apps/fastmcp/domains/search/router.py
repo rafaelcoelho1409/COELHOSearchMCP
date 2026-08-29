@@ -129,6 +129,12 @@ class SearchRouter:
         return None
 
 
-# Default router: Tavily, Exa, Jina, Linkup, You, Serper, Firecrawl, SerpApi,
-# Geekflare, TinyFish.
-router = SearchRouter([tavily, exa, jina, linkup, you, serper, firecrawl, serpapi, geekflare, tinyfish])
+# Default router — best quality first, recurring-quota providers ahead of
+# one-time banks (recurring > pinned fallback rule). Within the recurring
+# tier, order is evidence-backed answer/relevance quality (SimpleQA, AIMultiple):
+#   Linkup (92% SimpleQA) > You (91%) > Exa (top AIMultiple) > Geekflare
+#   (grounded answer) > Tavily (answer + live balance). TinyFish is the
+# unmetered, no-answer workhorse fallback. Then one-time banks by quality
+# (Firecrawl #2 AIMultiple > Serper > Jina), and SerpApi (recurring but lowest
+# quality, ~12.28 AIMultiple) last.
+router = SearchRouter([linkup, you, exa, geekflare, tavily, tinyfish, firecrawl, serper, jina, serpapi])
