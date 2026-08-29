@@ -23,6 +23,7 @@ from .providers.linkup import linkup
 from .providers.serpapi import serpapi
 from .providers.serper import serper
 from .providers.tavily import tavily
+from .providers.tinyfish import tinyfish
 from .providers.you import you
 from .schemas import SearchInput, SearchResponse
 
@@ -129,5 +130,5 @@ class SearchRouter:
 
 
 # Default router: Tavily, Exa, Jina, Linkup, You, Serper, Firecrawl, SerpApi,
-# Geekflare.
-router = SearchRouter([tavily, exa, jina, linkup, you, serper, firecrawl, serpapi, geekflare])
+# Geekflare, TinyFish.
+router = SearchRouter([tavily, exa, jina, linkup, you, serper, firecrawl, serpapi, geekflare, tinyfish])

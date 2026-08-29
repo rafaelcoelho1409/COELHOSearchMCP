@@ -320,7 +320,7 @@ API-cost version of Argus's Deep Hybrid Rank).
 
 ### Phase 3I — Geekflare provider (recurring free + grounded answer) ✅
 1. `providers/geekflare/` (`config.py` key `GEEKTFLARE_API_KEY`, `service.py` —
-   `GeekflareClient` + `GeekflareAdapter` POST to `https://api.geekflareapis.com/search`
+   `GeekflareClient` + `GeekflareAdapter` POST to `https://api.geekflare.com/search`
    with `x-api-key` header + `query`/`limit`/`source`/`format` body, `domain.py` —
    normalizes `data[]` of `title`/`url`/`snippet`/`position` to `SearchResult`
    and pulls the LLM-synthesized `answer` + `sources` when `groundedAnswer: true`).
@@ -333,6 +333,24 @@ API-cost version of Argus's Deep Hybrid Rank).
    `ProviderQuotaExceeded`; no live balance endpoint (credits=None).
 4. Append `geekflare` to the router (9th: tavily, exa, jina, linkup, you,
    serper, firecrawl, serpapi, geekflare).
+
+### Phase 3J — TinyFish provider (free unmetered index) ✅
+1. `providers/tinyfish/` (`config.py` key `TINYFISH_API_KEY`, `service.py` —
+   `TinyFishClient` + `TinyFishAdapter` GET to the **root path**
+   `https://api.search.tinyfish.ai/?query=...` with `X-API-Key` header + `query`/
+   `results` params, `domain.py` — normalizes `results[]` of `title`/`url`/
+   `snippet`/`position`/`site_name` to `SearchResult`).
+   NOTE: docs say `GET /search`, but that path returns the web-app HTML (404);
+   the real API lives on the root path (same pattern as Jina's `s.jina.ai`).
+2. Adds a **truly free, unmetered** independent index — search never draws from
+   the wallet (works at $0 balance), no card, ~30 req/min rate limit, ~0.5s
+   latency. Great as a free no-cost failover layer at the end of the chain.
+3. No answer payload (pure index). Honor `req.include_answer` by forwarding
+   intent via the optional `purpose` param (the docs recommend it to improve
+   ranking). Map `429`/`402`/`403` → `ProviderQuotaExceeded`; search is unmetered
+   so there is no credit balance to report (credits=None).
+4. Append `tinyfish` to the router (10th: tavily, exa, jina, linkup, you,
+   serper, firecrawl, serpapi, geekflare, tinyfish).
 
 ### Phase 4 — Quota observability
 1. `usage` tool already queries `/usage` (rate-limited 10/10min) — add caching so

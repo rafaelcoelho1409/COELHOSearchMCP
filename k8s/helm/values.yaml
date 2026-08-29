@@ -28,6 +28,8 @@ secretMappings:
     key: serpapi-api-key
   - envName: GEEKTFLARE_API_KEY
     key: geekflare-api-key
+  - envName: TINYFISH_API_KEY
+    key: tinyfish-api-key
 
 
 fastmcp:
