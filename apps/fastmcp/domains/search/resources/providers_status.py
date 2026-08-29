@@ -1,9 +1,9 @@
 """Resource: `search://providers`
 
-Returns the router's current per-provider state (available vs on cooldown)
-as JSON. Lets an MCP client load routing health as CONTEXT — e.g. an agent
-deciding between a cheap/fast search vs waiting can first read this resource
-instead of making a tool call.
+Returns the router's current per-provider bandit state (posterior, circuit
+breaker, BwK budget) as JSON. Lets an MCP client load routing health as
+CONTEXT — e.g. an agent deciding between a cheap/fast search vs waiting can
+first read this resource instead of making a tool call.
 
 Implementation: reads `router.status()` — pure/sync, no I/O.
 """
@@ -21,12 +21,14 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.resource("search://providers")
     async def providers_status() -> str:
-        """Return each search provider's current availability as JSON.
+        """Return each search provider's current bandit/health state as JSON.
 
-        Payload: `providers` (per-provider availability) plus `names` (the
-        `provider` values `web_search` accepts). Use this to understand which
-        provider will serve a `web_search` call, or to pick a specific one —
-        a provider on cooldown is skipped until its cooldown expires.
+        Payload: `providers` (per-provider posterior + circuit breaker +
+        BwK budget state) plus `names` (the `provider` values `web_search`
+        accepts). Use this to understand which provider will serve a
+        `web_search` call, or to pick a specific one — a provider that is
+        `available=False` is excluded (breaker OPEN, on cooldown, or budget
+        exhausted) until it recovers.
         """
         return json.dumps(
             {
