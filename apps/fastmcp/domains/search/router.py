@@ -16,6 +16,7 @@ import time
 from .providers.base import BaseSearchProvider
 from .providers.exa import exa
 from .providers.exceptions import ProviderQuotaExceeded
+from .providers.firecrawl import firecrawl
 from .providers.jina import jina
 from .providers.linkup import linkup
 from .providers.serper import serper
@@ -125,5 +126,5 @@ class SearchRouter:
         return None
 
 
-# Default router: Tavily first, then Exa, Jina, Linkup, You.com, Serper.
-router = SearchRouter([tavily, exa, jina, linkup, you, serper])
+# Default router: Tavily, Exa, Jina, Linkup, You, Serper, Firecrawl.
+router = SearchRouter([tavily, exa, jina, linkup, you, serper, firecrawl])

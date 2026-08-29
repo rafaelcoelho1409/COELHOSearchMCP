@@ -291,6 +291,19 @@ API-cost version of Argus's Deep Hybrid Rank).
    (credits=None).
 4. Append `serper` to the router (6th: tavily, exa, jina, linkup, you, serper).
 
+### Phase 3G — Firecrawl provider (LLM-ready markdown) ✅
+1. `providers/firecrawl/` (`config.py` key `FIRECRAWL_API_KEY`, `service.py` —
+   `FirecrawlClient` + `FirecrawlAdapter` POST to `https://api.firecrawl.dev/v1/search`
+   with `Authorization: Bearer` + `{"query", "limit"}` body, `domain.py` — normalizes `data[]`
+   to `SearchResult` (description IS the full LLM-ready markdown).
+2. Adds the richest content format the pool lacks (description = full-page markdown with
+   headers/tables/bullets, vs plain snippets elsewhere). AIMultiple #2 ranked (Agent Score
+   14.58, highest mean relevance 4.30/5). Free tier = 1,000 credits/month (2 credits/10 results
+   = ~500 results/month), no card, recurring monthly. Native `/v1/search` endpoint.
+3. Map `429`/`402`/`403` → `ProviderQuotaExceeded`; no live balance endpoint
+   (credits=None).
+4. Append `firecrawl` to the router (7th: tavily, exa, jina, linkup, you, serper, firecrawl).
+
 ### Phase 4 — Quota observability
 1. `usage` tool already queries `/usage` (rate-limited 10/10min) — add caching so
    hot loops don't burn the usage endpoint's own rate limit.

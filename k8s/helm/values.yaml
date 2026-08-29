@@ -22,6 +22,8 @@ secretMappings:
     key: youcom-api-key
   - envName: SERPER_API_KEY
     key: serper-api-key
+  - envName: FIRECRAWL_API_KEY
+    key: firecrawl-api-key
 
 
 fastmcp:
