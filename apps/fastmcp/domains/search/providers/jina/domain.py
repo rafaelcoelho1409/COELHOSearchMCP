@@ -40,7 +40,6 @@ def parse_results(text: str, max_results: int | None = None) -> list[SearchResul
     if not text:
         return []
 
-    blocks: list[dict[str, str]] = []
     headers_by_block: dict[str, dict[str, str]] = {}
     order: list[str] = []
 
@@ -96,16 +95,21 @@ def parse_results(text: str, max_results: int | None = None) -> list[SearchResul
         title = (h.get("Title") or "").strip()
         desc = (h.get("Description") or "").strip()
         body = (content.get(idx) or "").strip()
-        # Title/Description may be empty; prefer the page body as content, and
-        # fall back to the description when the body is missing.
-        page_content = body or desc
+        # Jina scrapes the RENDERED page, so `body` is full page markdown full of
+        # chrome (cookie walls, login/blocked notices, nav) rather than a clean
+        # snippet. The `Description` field (when present) is the curated snippet —
+        # prefer it for `content`; fall back to the body only when no description
+        # is provided. The fuller body is still exposed as `raw_content` for deep
+        # context on demand.
+        snippet = body or desc  # unchanged fallback when body only
+        page_content = desc or body  # prefer the curated description
         results.append(
             SearchResult(
                 title=title,
                 url=url,
                 content=page_content,
                 score=None,  # Jina search provides no relevance score
-                raw_content=page_content or None,
+                raw_content=(snippet if snippet != page_content else None),
             )
         )
 

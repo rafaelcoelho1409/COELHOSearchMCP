@@ -21,6 +21,7 @@ import time
 from .bandit import BanditService, get_or_create
 from .bandit.domain import compose_reward, make_context_vector
 from .bandit.params import EXPECTED_LATENCY_S
+from .fusion import dedup, normalize_result, rrf_fuse, tidiness_score
 from .providers.base import BaseSearchProvider
 from .providers.exa import exa
 from .providers.exceptions import ProviderQuotaExceeded
@@ -40,6 +41,12 @@ logger = logging.getLogger(__name__)
 
 # How many attempts before we give up and raise (prevents unbounded cascades).
 MAX_ATTEMPTS = 6
+
+# Providers fused on the quality ensemble path (see ROUTING.md §7). Higher =
+# richer pool but more quota burn; 3 is the SOTA "retrieve wide, rerank narrow"
+# balance. Set to 1 to preserve free-tier quota: exactly one provider per
+# request, maximizing the number of searches you can serve.
+ENSEMBLE_SIZE = 1
 
 
 class SearchRouter:
@@ -108,11 +115,13 @@ class SearchRouter:
             search_depth=req.search_depth,
             include_answer=req.include_answer,
         )
+        self._last_max_results = req.max_results
         if req.provider and req.provider != "auto":
             pinned = self._by_name(req.provider)
             if pinned is not None and self.bandit.is_available(pinned.name):
                 try:
-                    return await self._dispatch(pinned, req, ctx)
+                    resp = await self._dispatch(pinned, req, ctx)
+                    return self._normalize_single(resp)
                 except ProviderQuotaExceeded:
                     logger.warning(
                         "[router] pinned %s quota exceeded -> fallback auto",
@@ -127,8 +136,20 @@ class SearchRouter:
             raise last_error
         raise RuntimeError("search: no providers available (cooldown / budget exhausted)")
 
-    async def _dispatch(self, provider: BaseSearchProvider, req: SearchInput, ctx=None) -> SearchResponse:
-        """Call one provider, update the bandit (reward + breaker + budget), return or raise."""
+    async def _dispatch(
+        self,
+        provider: BaseSearchProvider,
+        req: SearchInput,
+        ctx=None,
+        *,
+        book_reward: bool = True,
+    ) -> tuple[SearchResponse, float] | SearchResponse:
+        """Call one provider, update the bandit (reward + breaker + budget), return or raise.
+
+        By default books a reward and returns the bare response (single-provider
+        path). When `book_reward=False` (ensemble path) the caller books the
+        fused quality-loaded reward later, so this returns `(resp, latency_s)`.
+        """
         start = time.monotonic()
         try:
             resp: SearchResponse = await provider.search(req, ctx)
@@ -141,48 +162,155 @@ class SearchRouter:
         latency = time.monotonic() - start
         self.bandit.record_success(provider.name)
         self.bandit.consume_budget(provider.name, amount=1.0)
-        self.bandit.update_score(
-            provider.name,
-            self._last_context,
-            compose_reward(
-                success=True,
-                results_count=len(resp.results),
-                latency_s=latency,
-                expected_latency_s=EXPECTED_LATENCY_S,
-                answer_present=bool(resp.answer),
-            ),
-        )
+        if book_reward:
+            self.bandit.update_score(
+                provider.name,
+                self._last_context,
+                compose_reward(
+                    success=True,
+                    results_count=len(resp.results),
+                    latency_s=latency,
+                    expected_latency_s=EXPECTED_LATENCY_S,
+                    answer_present=bool(resp.answer),
+                ),
+            )
         logger.info(
             "[router] %s served in %.2fs (%d results, answer=%s)",
             provider.name, latency, len(resp.results), bool(resp.answer),
         )
-        return resp
+        return (resp, latency) if not book_reward else resp
+
+    def _is_ensemble(self, req: SearchInput) -> bool:
+        """Quality ensemble path: `include_answer` or `advanced` depth.
+
+        These are the requests where fusion quality pays off most (an answer
+        or a thorough pool deserves the extra quota). Plain basic/`include_answer=False`
+        stays on the cheap single-provider path that never burns extra quota.
+        """
+        return bool(req.include_answer) or req.search_depth == "advanced"
+
+    def _normalize_single(self, resp: SearchResponse) -> SearchResponse:
+        """Cap bloated content + de-dup URLs for a single-provider response.
+
+        Fixes the cross-provider consistency gap (e.g. Firecrawl raw-page bloat)
+        even on the cheap path, deterministically, with zero extra latency.
+        """
+        seen_urls: set[str] = set()
+        cleaned: list = []
+        for r in dedup(resp.results):
+            if not r.url or r.url in seen_urls:
+                continue
+            seen_urls.add(r.url)
+            cleaned.append(normalize_result(r))
+        return SearchResponse(
+            query=resp.query,
+            provider=resp.provider,
+            results=cleaned[: self._last_max_results],
+            answer=resp.answer,
+        )
 
     async def _search_auto(self, req: SearchInput, ctx=None) -> tuple[SearchResponse | None, Exception | None]:
-        """Fail-fast cascade: repeatedly pick the current best-scored available arm.
+        """Dispatch per path:
+        - **basic** (default): fail-fast single-provider cascade (cheap, current
+          behavior) + deterministic content/URL normalization of the winner.
+        - **advanced / include_answer**: quality ensemble — try the top
+          `ENSEMBLE_SIZE` available arms, fuse their results with RRF, de-dup,
+          then book a fusion-survival + tidiness quality reward per contributor.
 
-        After each failure the arm's score drops (and its breaker/cooldown may
-        exclude it), so the next iteration picks a fresh best — a true cascade
-        that only stops when every arm is exhausted/unavailable or a request
-        succeeds. Bounded by MAX_ATTEMPTS as a safety valve.
+        Every failure records a penalty so the next iteration picks a fresh best;
+        bounded by MAX_ATTEMPTS as a safety valve.
         """
+        if not self._is_ensemble(req):
+            last_error: Exception | None = None
+            attempts = 0
+            while attempts < MAX_ATTEMPTS:
+                ranked = self._ranked(self.available())
+                if not ranked:
+                    break
+                provider = ranked[0]
+                attempts += 1
+                try:
+                    resp = await self._dispatch(provider, req, ctx)
+                    return self._normalize_single(resp), None
+                except ProviderQuotaExceeded as e:
+                    logger.warning("[router] %s quota exceeded -> failover", provider.name)
+                    last_error = e
+                except Exception as e:  # noqa: BLE001 — network/parse
+                    logger.error("[router] %s error: %s", provider.name, e)
+                    last_error = e
+            return None, last_error
+
+        return await self._search_ensemble(req, ctx)
+
+    async def _search_ensemble(self, req: SearchInput, ctx=None) -> tuple[SearchResponse | None, Exception | None]:
+        """Fuse a small ensemble of the top-scored available arms (ROUTING.md §7)."""
         last_error: Exception | None = None
         attempts = 0
-        while attempts < MAX_ATTEMPTS:
-            ranked = self._ranked(self.available())
-            if not ranked:
+        used: set[str] = set()
+        contributed: list[tuple[str, SearchResponse, float]] = []
+
+        def _next_targets() -> list[BaseSearchProvider]:
+            return [p for p in self._ranked(self.available()) if p.name not in used]
+
+        while attempts < MAX_ATTEMPTS and len(contributed) < ENSEMBLE_SIZE:
+            targets = _next_targets()
+            if not targets:
                 break
-            provider = ranked[0]
+            provider = targets[0]
+            used.add(provider.name)
             attempts += 1
             try:
-                return await self._dispatch(provider, req, ctx), None
+                resp, latency = await self._dispatch(provider, req, ctx, book_reward=False)
+                contributed.append((provider.name, resp, latency))
             except ProviderQuotaExceeded as e:
-                logger.warning("[router] %s quota exceeded -> failover", provider.name)
+                logger.warning("[router] ensemble %s quota exceeded -> skip", provider.name)
                 last_error = e
             except Exception as e:  # noqa: BLE001 — network/parse
-                logger.error("[router] %s error: %s", provider.name, e)
+                logger.error("[router] ensemble %s error: %s", provider.name, e)
                 last_error = e
-        return None, last_error
+
+        if not contributed:
+            return None, last_error
+
+        # Each provider's (normalized, de-duped) contributed list.
+        per_provider: dict[str, list] = {}
+        for name, resp, _lat in contributed:
+            per_provider[name] = dedup([normalize_result(r) for r in resp.results if r.url])
+
+        fused = rrf_fuse([per_provider[n] for n in per_provider], max_results=self._last_max_results)
+
+        answer = next((r.answer for (_n, r, _l) in contributed if r.answer), None)
+
+        # Book quality-loaded rewards per contributor (fusion-survival + tidiness).
+        fused_urls = {r.url for r in fused}
+        for name, resp, latency in contributed:
+            mine = per_provider[name]
+            if not mine:
+                continue
+            survived = sum(1 for r in mine if r.url in fused_urls)
+            survival = survived / len(mine) if mine else 0.0
+            tidy = tidiness_score([normalize_result(r) for r in resp.results])
+            self.bandit.update_score(
+                name,
+                self._last_context,
+                compose_reward(
+                    success=True,
+                    results_count=len(fused),
+                    latency_s=latency,
+                    expected_latency_s=EXPECTED_LATENCY_S,
+                    answer_present=bool(answer) and answer is resp.answer,
+                    fusion_survival=survival,
+                    tidiness=tidy,
+                ),
+            )
+
+        resp = SearchResponse(
+            query=req.query,
+            provider=",".join(per_provider.keys()) or "auto",
+            results=fused,
+            answer=answer,
+        )
+        return resp, None
 
     def _ranked(self, healthy: list[BaseSearchProvider]) -> list[BaseSearchProvider]:
         """Order healthy arms by bandit score (best first), preserving stability."""

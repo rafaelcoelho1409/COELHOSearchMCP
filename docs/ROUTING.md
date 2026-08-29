@@ -124,3 +124,53 @@ non-answer path.
 - **A contextual bandit is the right class; FGTS-VA is the SOTA base.** The
   three upgrades (breaker + sliding-window + BwK pre-filter) make it SOTA *for
   this specific problem*.
+
+## 8. Quality result pool — normalization, dedup, RRF fusion (implemented)
+
+Routing picks WHICH provider, but the user asked for a **great pool of quality
+results** — this layer governs WHAT comes back. SOTA (Aug 2026) synthesis:
+"retrieve wide, rerank narrow" — fuse a small ensemble only where quality pays,
+and normalize/dedup deterministically everywhere. Implemented in
+`domains/search/fusion.py` (pure Functional Core) + router integration:
+
+### 8.1 Two dispatch paths (cost-disciplined)
+- **basic / default** (cheap): single-provider fail-fast cascade (unchanged),
+  then deterministic **normalization** of the winner — cap `content` to
+  `CONTENT_CAP_CHARS` (500), strip tracking params, drop fragment, lowercase
+  scheme/host. Kills the cross-provider inconsistency (Firecrawl raw-page bloat).
+- **advanced / `include_answer=True`** (quality ensemble): dispatch the top
+  `ENSEMBLE_SIZE` (3) available arms, **fuse** their result lists with
+  **Reciprocal Rank Fusion (RRF, k=60)**, then normalize + de-dup. Consensus-
+  relevant pages (present in several lists) float to the top. Response `provider`
+  is tagged as a comma-joined list ("linkup,exa,geekflare").
+
+### 8.2 RRF why (score-agnostic)
+Per-provider `score` scales are incompatible (Tavily numeric, others null). RRF
+uses only **rank position**: `Σ 1/(k + rank)` per URL, k=60. No training, no
+weights, no score normalization — the 2026 standard. Note it runs even on
+`raw_content`-only providers by keying on canonicalized URL.
+
+### 8.3 Dedup stages
+1. **Exact URL** (after canonicalization) — the core, always-on.
+2. **MinHash near-dup** for syndicated content — optional, not yet wired.
+3. **Semantic dup** (embeddings) — requires an embedder we don't carry; skipped.
+
+### 8.4 Quality-aware reward (self-supervised, no LLM)
+`compose_reward` gains two downstream quality terms (weight 0.15, rebalancing
+success/results/latency/answer):
+- **fusion-survival agreement**: share of a provider's results that survive RRF
+  into the final top-k — consensus-relevance, learned for free from real data.
+- **content tidiness**: token-efficiency (compact `content` preferred) — targets
+  bloat directly.
+So the bandit now learns provider QUALITY, not just speed/count/latency.
+
+### 8.5 Quota math
+Ensemble calls up to 3 arms per advanced/answer request (1 per basic request).
+The recurring > pinned rule is preserved: the BANDIT still ranks, ensemble just
+takes the top-N available instead of top-1. RRF/quality signals never fire an
+extra provider on the default path — only on the paths the user opted into.
+
+### 8.6 Keys in `params.py` / `schemas.py`
+- `fusion.py`: `CONTENT_CAP_CHARS=500`, `RRF_K=60`.
+- `config.py` `RewardWeights`: `success .30, results .20, latency .15, answer .20, quality .15`.
+- `router.py`: `ENSEMBLE_SIZE=3`; `SearchResponse.provider` may be comma-joined.

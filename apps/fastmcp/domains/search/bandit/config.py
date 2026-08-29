@@ -25,12 +25,21 @@ class FGTSVAConfig:
 
 @dataclass(frozen=True, slots=True)
 class RewardWeights:
-    """Sums to ~1.0 when all signals present. Quality-focused success signals."""
+    """Sums to ~1.0 when all signals present. Quality-focused success signals.
+
+    Adds the two self-supervised quality terms from docs/ROUTING.md §7:
+    - `quality`: fusion-survival agreement (share of a provider's results that
+      survive RRF into the final top-k) and content tidiness (token-efficiency).
+      Both are computed downstream from real served data — no LLM judge.
+    Weights rebalanced so `success` stays the floor and `quality` becomes an
+    equal peer of yield/answer (quality-first feature).
+    """
 
     success: float = 0.30
-    results: float = 0.25
-    latency: float = 0.20
-    answer: float = 0.25
+    results: float = 0.20
+    latency: float = 0.15
+    answer: float = 0.20
+    quality: float = 0.15
 
 
 FGTS_VA = FGTSVAConfig()

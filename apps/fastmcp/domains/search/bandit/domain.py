@@ -171,12 +171,16 @@ def compose_reward(
     expected_latency_s: float | None = None,
     answer_present: bool = False,
     error_class: str | None = None,
+    fusion_survival: float = 0.0,
+    tidiness: float = 0.0,
 ) -> float:
     """Scalar reward in ~[-0.8, +1.0]; failure path driven by error_class penalties.
 
     Success path weights (`REWARDS`) reward quality: result yield, latency
-    ratio, and whether an answer was produced (mirrors Nexus hash_recall slot as
-    an answer signal here).
+    ratio, answer production, and — new — the fusion-survival agreement and
+    content-tidiness quality signals (docs/ROUTING.md §7). `fusion_survival`
+    and `tidiness` are 0..1 and default 0 when a request wasn't fused (the
+    single-provider path pays only the quality floor).
     """
     if not success:
         return float(
@@ -193,4 +197,6 @@ def compose_reward(
         r += REWARDS.latency * (lat_signal / 2.0)
     if answer_present:
         r += REWARDS.answer
+    # Quality terms: both 0..1, averaged before the weight (quality-first).
+    r += REWARDS.quality * ((float(fusion_survival) + float(tidiness)) / 2.0)
     return r
