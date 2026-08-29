@@ -318,6 +318,22 @@ API-cost version of Argus's Deep Hybrid Rank).
 4. Append `serpapi` to the router (8th: tavily, exa, jina, linkup, you, serper,
    firecrawl, serpapi).
 
+### Phase 3I — Geekflare provider (recurring free + grounded answer) ✅
+1. `providers/geekflare/` (`config.py` key `GEEKTFLARE_API_KEY`, `service.py` —
+   `GeekflareClient` + `GeekflareAdapter` POST to `https://api.geekflareapis.com/search`
+   with `x-api-key` header + `query`/`limit`/`source`/`format` body, `domain.py` —
+   normalizes `data[]` of `title`/`url`/`snippet`/`position` to `SearchResult`
+   and pulls the LLM-synthesized `answer` + `sources` when `groundedAnswer: true`).
+2. Adds a recurring free balance with an **answer** (the `include_answer` gap
+   filler for providers with none). Free tier = 500 credits/mo, no card,
+   recurring; standard search = 2 credits, grounded answer = 5 credits
+   (≈250 plain searches/mo).
+3. Honor `req.include_answer` → pass `groundedAnswer: true` (costs 5 credits
+   vs 2). Map HTTP `429`/`402`/`403` and API-level `4xx` `apiStatus` →
+   `ProviderQuotaExceeded`; no live balance endpoint (credits=None).
+4. Append `geekflare` to the router (9th: tavily, exa, jina, linkup, you,
+   serper, firecrawl, serpapi, geekflare).
+
 ### Phase 4 — Quota observability
 1. `usage` tool already queries `/usage` (rate-limited 10/10min) — add caching so
    hot loops don't burn the usage endpoint's own rate limit.

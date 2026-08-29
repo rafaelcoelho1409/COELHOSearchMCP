@@ -26,6 +26,8 @@ secretMappings:
     key: firecrawl-api-key
   - envName: SERPAPI_API_KEY
     key: serpapi-api-key
+  - envName: GEEKTFLARE_API_KEY
+    key: geekflare-api-key
 
 
 fastmcp:

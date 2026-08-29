@@ -17,6 +17,7 @@ from .providers.base import BaseSearchProvider
 from .providers.exa import exa
 from .providers.exceptions import ProviderQuotaExceeded
 from .providers.firecrawl import firecrawl
+from .providers.geekflare import geekflare
 from .providers.jina import jina
 from .providers.linkup import linkup
 from .providers.serpapi import serpapi
@@ -127,5 +128,6 @@ class SearchRouter:
         return None
 
 
-# Default router: Tavily, Exa, Jina, Linkup, You, Serper, Firecrawl, SerpApi.
-router = SearchRouter([tavily, exa, jina, linkup, you, serper, firecrawl, serpapi])
+# Default router: Tavily, Exa, Jina, Linkup, You, Serper, Firecrawl, SerpApi,
+# Geekflare.
+router = SearchRouter([tavily, exa, jina, linkup, you, serper, firecrawl, serpapi, geekflare])
