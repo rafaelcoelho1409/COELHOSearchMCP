@@ -18,6 +18,8 @@ secretMappings:
     key: jina-api-key
   - envName: LINKUP_API_KEY
     key: linkup-api-key
+  - envName: YOUCOM_API_KEY
+    key: youcom-api-key
 
 
 fastmcp:

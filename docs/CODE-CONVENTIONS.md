@@ -227,11 +227,57 @@ Phase order is deliberate — each step is additive and testable.
 3. Map 402/429 → `ProviderQuotaExceeded`; free tier, no queryable balance
    (credits=None).
 
-### Phase 3D — RRF merge (optional, cross-provider quality)
-- If/when you want multi-provider merges (not just failover), add Reciprocal Rank
-  Fusion in `router.py` to combine results across providers (competitors like
-  Argus do this: `failover + RRF ranking`). Only when single-provider failover
-  is proven.
+### Phase 3D — RRF merge (optional, cross-provider quality) — IDEA SAVED
+> Status: **deferred** (algorithms implemented later). Design captured below.
+
+**What it is:** Reciprocal Rank Fusion (RRF) merges the SAME query's results from
+**multiple providers in parallel** into one harmonized list — as opposed to the
+current design, which uses providers for **failover** (one at a time by priority).
+
+**Why raw scores can't be averaged:** each provider ranks with its own metric and
+they're not comparable (Tavily gives 0-1 scores; Exa/Jina/Linkup give none). RRF
+ignores raw scores and uses only each result's **rank position** within its
+provider list:
+
+    score(url) = Σ over providers  1 / (rank_in_that_provider + k),   k = 60 (typical)
+
+Results ranked high in MULTIPLE providers win (consensus ≈ relevance). RRF also
+de-dupes URLs across providers by construction.
+
+**Example:** `docs.djangoproject.com` ranked 1·2·3·1 across 4 providers scores
+0.0642, while a page only Linkup ranks 2 scores 0.0161 → Django docs wins.
+
+**Trade-offs (why it's opt-in, not default):**
+- 4x per-query API cost (hits every provider)
+- Waits for the slowest provider (latency)
+- 4x content = heavy tokens (bad for small models like Qwen-27B)
+- Adds a `merge`/`search_mode` footgun to the tool
+
+**Recommended integration:** keep `auto` = cheap single-provider failover as the
+default (optimal for the token-conscious small-model stack). Add RRF as an **opt-in
+mode**, e.g. `web_search(merge="rrf")` or `provider="all"` for high-stakes /
+deep-research queries. This mirrors Argus/Oracle: failover for default, RRF for
+consensus-heavy research.
+
+**Implementation sketch:** `router.merge_rrf(providers, req, ctx)` → run
+`asyncio.gather` over all available providers → fuse by `score = Σ 1/(rank+k)` →
+sort desc → return unified `SearchResponse` (dropping per-provider scores, which
+are RRF scores, not provider scores). Add an RRF rank refinement step (Phase 6)
+that reorders using the top fused result as a reranking query, per the Google
+demo on combining generative and extractive search (a deterministic, no-additional-
+API-cost version of Argus's Deep Hybrid Rank).
+
+### Phase 3E — You.com provider (keyless daily quota) ✅
+1. `providers/you/` (`config.py` key `YOUCOM_API_KEY`, `service.py` —
+   `YouClient` + `YouAdapter` POST to `https://ydc-index.io/v1/search`,
+   `domain.py` — normalizes `results.web[]` (and `results.news[]` fallback)).
+2. Auth is `X-API-Key` (Optional on free tier). NOTE: the canonical host is the
+   bare `ydc-index.io` (NO `api.` subdomain) — `api.you.com` 500s and
+   `api.ydc-index.io` rejects the token. Quote-strip the key in `__post_init__`
+   (a `YOUCOM_API_KEY="..."` .env value otherwise ships with literal quotes).
+3. Map `429`/`402`/`403` → `ProviderQuotaExceeded`; free tier = 100 queries/day,
+   no live balance endpoint (credits=None).
+4. Append `you` to the router (5th in priority: tavily, exa, jina, linkup, you).
 
 ### Phase 4 — Quota observability
 1. `usage` tool already queries `/usage` (rate-limited 10/10min) — add caching so

@@ -41,7 +41,8 @@ class SearchInput(BaseModel):
         description=(
             "Which search provider to use. 'auto' (default) lets the router pick "
             "by priority and fail over automatically. Or pin a specific provider: "
-            "'tavily' or 'exa'. Unrecognized/on-cooldown names fall back to 'auto'."
+            "'tavily', 'exa', 'jina', 'linkup', or 'you'. Unrecognized/on-cooldown "
+            "names fall back to 'auto'."
         ),
     )
 
