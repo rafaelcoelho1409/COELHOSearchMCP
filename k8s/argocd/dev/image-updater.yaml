@@ -1,0 +1,35 @@
+# =============================================================================
+# ARGOCD IMAGE UPDATER CR - COELHO Search MCP
+# =============================================================================
+# SCOPE: pairs with application.yaml — both are COELHO Cloud-only because
+#   they expect ArgoCD + GitLab + the coelho-cloud-registry in-cluster
+#   hostname. None of those exist on the COELHO Search MCP standalone k3d cluster.
+#
+# For COELHO Search MCP: `skaffold run` handles build → push → deploy end-to-end
+#   (cross-platform, no shell scripts). No Image Updater needed because
+#   Skaffold rewrites image refs to unique sha256 tags on every build, which
+#   forces a fresh rollout automatically.
+#
+# Apply to COELHO Cloud's ArgoCD:
+#   kubectl apply -f k8s/argocd/dev/
+#
+# Flow on COELHO Cloud: GitLab CI builds → Registry → Image Updater detects → ArgoCD deploys
+# =============================================================================
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: coelho-search-mcp
+  namespace: argocd
+spec:
+  applicationRefs:
+    - namePattern: coelho-search-mcp
+      images:
+        - alias: fastmcp
+          imageName: coelho-cloud-registry:5000/coelho-search-mcp-fastmcp:latest
+          commonUpdateSettings:
+            updateStrategy: digest
+          manifestTargets:
+            helm:
+              spec: fastmcp.image
+  writeBackConfig:
+    method: argocd

@@ -91,7 +91,7 @@ template:
     labels:
       app: coelho-search-mcp-{{ .appName }}
   spec:
-    {{- if and (eq .root.Values.environment "production") (.root.Values.registry.imagePullSecret) }}
+    {{- if and (eq .root.Values.environment "production") (.root.Values.registry) (.root.Values.registry.imagePullSecret) }}
     imagePullSecrets:
       - name: {{ .root.Values.registry.imagePullSecret }}
     {{- end }}

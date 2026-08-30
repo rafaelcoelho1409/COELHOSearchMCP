@@ -1,0 +1,48 @@
+# =============================================================================
+# ARGOCD APPLICATION - COELHO Search MCP (PROD — COELHO Search MCP standalone k3d)
+# =============================================================================
+# SCOPE: COELHO Search MCP standalone k3d cluster. ArgoCD syncs the Helm chart
+#   from the public GitHub repository. Image rollouts are handled separately
+#   by ArgoCD Image Updater watching coelho-search-mcp-registry:5000 (see
+#   image-updater.yaml). Images are built and pushed via skaffold build.
+#
+# Apply:
+#   kubectl apply -f k8s/argocd/prod/
+#
+# Namespaces:
+#   - coelho-search-mcp-dev: Skaffold local development (ports 23030-23039)
+#   - coelho-search-mcp:     ArgoCD production (ports 23000-23019)
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: coelho-search-mcp
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rafaelcoelho1409/COELHOSearchMCP.git
+    targetRevision: master
+    path: k8s/helm
+    helm:
+      releaseName: coelho-search-mcp
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: coelho-search-mcp
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
