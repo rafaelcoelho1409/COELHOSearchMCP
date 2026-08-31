@@ -30,7 +30,8 @@ build:
         # Allow plain-HTTP push to the in-cluster k3d registry.
         # k3d registry in-cluster address (172.22.0.8:5000 on k3d-coelho-cloud network).
         # localhost:5001 only works from the host, not from inside the CI pod.
-        - --insecure-registry=172.22.0.8:5000
+        - --insecure-registry=localhost:5001
+        # - --insecure-registry=172.22.0.8:5000
   only:
     - master
     - main
