@@ -89,6 +89,11 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          # Must match skaffold.yaml artifacts[0].image. NOTE: --default-repo
+          # is IGNORED for fully-qualified artifact names, so the push below
+          # lands at localhost:5001 (same k3d registry via node loopback).
+          BUILT="localhost:5001/${IMAGE}"
+          DEST="${REGISTRY}/${IMAGE}"
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
             # Validate only — no push from PRs.
             skaffold build --tag="${SHORT_SHA}"
@@ -96,9 +101,13 @@ jobs:
             skaffold build --push \
               --default-repo="${REGISTRY}" \
               --tag="${SHORT_SHA}"
-            # Floating tag for digest-strategy Image Updaters watching :latest.
-            # Short-sha tags keep per-commit traceability; :latest lets the
-            # updater fire on every push.
-            docker tag "${REGISTRY}/${IMAGE}:${SHORT_SHA}" "${REGISTRY}/${IMAGE}:latest"
-            docker push "${REGISTRY}/${IMAGE}:latest"
+            # Updater-facing names (digest-strategy Image Updaters watch
+            # coelho-cloud-registry:5000). Same backing registry, so the
+            # second push is blob mounts, near-instant.
+            docker tag "${BUILT}:${SHORT_SHA}" "${DEST}:${SHORT_SHA}"
+            docker push "${DEST}:${SHORT_SHA}"
+            # Floating tag so :latest watchers fire on every push; short-sha
+            # tags keep per-commit traceability.
+            docker tag "${DEST}:${SHORT_SHA}" "${DEST}:latest"
+            docker push "${DEST}:latest"
           fi
