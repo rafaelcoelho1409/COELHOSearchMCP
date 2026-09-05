@@ -2,14 +2,12 @@
 # ARGOCD APPLICATION - COELHO Search MCP
 # =============================================================================
 # SCOPE: This file targets the COELHO Cloud production cluster. The
-#   `repoURL` below points at the in-cluster GitLab service, which only
-#   exists on COELHO Cloud (the gitlab module is intentionally NOT included
-#   in the COELHO Search MCP standalone infrastructure port).
+#   `repoURL` below points at the in-cluster Forgejo service, which only
+#   exists on COELHO Cloud (the forgejo module lives in
+#   COELHOCloud/infrastructure/modules/forgejo).
 #
 # For the COELHO Search MCP standalone k3d cluster: do NOT apply this file. Use
-#   `skaffold run` instead (after `kubectl config use-context k3d-coelho-search-mcp`)
-#   — the `coelho-search-mcp` profile in skaffold.yaml auto-activates via kubeContext
-#   and handles build, push, and helm install in one cross-platform command.
+#   `skaffold dev` instead (after `kubectl config use-context k3d-coelho-search-mcp`).
 #   See COELHONexus docs/K8S-DUAL-CLUSTER-FLEX-2026-06-19.md for the architecture rationale.
 #
 # Apply to COELHO Cloud's ArgoCD:
@@ -29,11 +27,18 @@ metadata:
 spec:
   project: default
   source:
+    # Forgejo repository URL — MUST be the in-cluster service URL so it
+    # prefix-matches the repo-creds Secret (if the repo ever goes private)
+    # and avoids the TLS hop. Repo is mirrored to GitHub, but ArgoCD pulls
+    # here: Forgejo is where CI pushes and where .forgejo/workflows lives.
+    repoURL: http://forgejo-http.forgejo.svc.cluster.local:3000/forgejo_admin/COELHOSearchMCP.git
+    # LEGACY (GitLab era, kept for reference — do NOT re-enable without
+    #   restoring the gitlab module + argocd-gitlab-repo-creds + CI pushes):
     # GitLab repository URL — MUST be the in-cluster service URL so it
     # prefix-matches the `argocd-gitlab-repo-creds` repo-creds Secret (the PAT is
     # registered under this URL). Using the Tailscale HTTPS URL clones anonymously
     # → "HTTP Basic: Access denied" on the private repo. Also avoids the TLS hop.
-    repoURL: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/COELHOSearchMCP.git
+    # repoURL: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/COELHOSearchMCP.git
     targetRevision: master
     path: k8s/helm
     helm:

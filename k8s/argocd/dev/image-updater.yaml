@@ -2,7 +2,7 @@
 # ARGOCD IMAGE UPDATER CR - COELHO Search MCP
 # =============================================================================
 # SCOPE: pairs with application.yaml — both are COELHO Cloud-only because
-#   they expect ArgoCD + GitLab + the coelho-cloud-registry in-cluster
+#   they expect ArgoCD + Forgejo + the coelho-cloud-registry in-cluster
 #   hostname. None of those exist on the COELHO Search MCP standalone k3d cluster.
 #
 # For COELHO Search MCP: `skaffold run` handles build → push → deploy end-to-end
@@ -13,7 +13,8 @@
 # Apply to COELHO Cloud's ArgoCD:
 #   kubectl apply -f k8s/argocd/dev/
 #
-# Flow on COELHO Cloud: GitLab CI builds → Registry → Image Updater detects → ArgoCD deploys
+# Flow on COELHO Cloud: Forgejo Actions builds → Registry → Image Updater detects → ArgoCD deploys
+# (LEGACY: same flow ran on GitLab CI before the Forgejo migration, 2026-09-05.)
 # =============================================================================
 apiVersion: argocd-image-updater.argoproj.io/v1alpha1
 kind: ImageUpdater
