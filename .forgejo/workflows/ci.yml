@@ -1,0 +1,95 @@
+# =============================================================================
+# FORGEJO ACTIONS — COELHO Search MCP (Skaffold build → k3d registry → Image Updater)
+# =============================================================================
+# Ported from `.gitlab-ci.yml` (GitLab CI). Same GitOps flow, Forgejo-native:
+#   git push → Forgejo Actions `skaffold build --push` → ArgoCD Image Updater
+#   detects new digest → patches Application → ArgoCD reconciles → rollout.
+# No deploy job: GitOps owns deploys.
+#
+# Runner assumptions (COELHOCloud `forgejo-runner`,
+# `COELHOCloud/infrastructure/modules/forgejo/`):
+#   - `runs-on: ubuntu-latest` → catthehacker act image (docker CLI present).
+#   - Job containers run with host network; DOCKER_HOST=tcp://localhost:2376
+#     (TLS) is forwarded from the runner's dind sidecar into every job — do
+#     NOT override DOCKER_HOST and do NOT start your own dind `services:`.
+#   - dind allowlists `coelho-cloud-registry:5000` as insecure, and k3d puts
+#     that hostname in every node's /etc/hosts — plain-HTTP push just works.
+#     (Old GitLab CI hardcoded 172.22.0.8:5000; the hostname survives
+#     cluster recreates.)
+#   - Registry target here is the COELHOCloud cluster registry. The
+#     standalone-cluster updater (`k8s/argocd/prod/image-updater.yaml`,
+#     `coelho-search-mcp-registry:5000`) belongs to the other k3d context and
+#     is served by `skaffold dev` (localhost:5001), not by this workflow.
+# =============================================================================
+
+name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: coelho-cloud-registry:5000
+  IMAGE: coelho-search-mcp-fastmcp
+  SKAFFOLD_VERSION: v2.16.1 # keep in sync with local dev pin
+  DOCKER_BUILDKIT: "1"
+
+jobs:
+  build:
+    name: skaffold build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Skaffold
+        run: |
+          set -euo pipefail
+          curl -sSL -o /tmp/skaffold \
+            "https://storage.googleapis.com/skaffold/releases/${SKAFFOLD_VERSION}/skaffold-linux-amd64"
+          chmod +x /tmp/skaffold
+          if [ -w /usr/local/bin ]; then
+            mv /tmp/skaffold /usr/local/bin/skaffold
+          else
+            mkdir -p "$HOME/.local/bin"
+            mv /tmp/skaffold "$HOME/.local/bin/skaffold"
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          fi
+          skaffold version
+
+      - name: Wait for Docker (runner dind)
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            docker info >/dev/null 2>&1 && break
+            sleep 2
+          done
+          docker info
+
+      - name: Skaffold build + push
+        run: |
+          set -euo pipefail
+          SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            # Validate only — no push from PRs.
+            skaffold build --tag="${SHORT_SHA}"
+          else
+            skaffold build --push \
+              --default-repo="${REGISTRY}" \
+              --tag="${SHORT_SHA}"
+            # Floating tag for digest-strategy Image Updaters watching :latest.
+            # Short-sha tags keep per-commit traceability; :latest lets the
+            # updater fire on every push.
+            docker tag "${REGISTRY}/${IMAGE}:${SHORT_SHA}" "${REGISTRY}/${IMAGE}:latest"
+            docker push "${REGISTRY}/${IMAGE}:latest"
+          fi
