@@ -89,18 +89,16 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
-          # --default-repo rewrites the push target (log line still shows the
-          # skaffold.yaml name, confusingly). Do NOT pull localhost:5001 here:
-          # from host-network jobs it refuses connection; the real push lands
-          # at DEST below.
+          # -p ci selects the skaffold.yaml `ci` profile whose artifact image
+          # is already coelho-cloud-registry:5000/coelho-search-mcp-fastmcp
+          # (the repo Image Updater watches). No --default-repo: it mangles
+          # qualified names (localhost_5001_... repo) instead of replacing.
           DEST="${REGISTRY}/${IMAGE}"
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
             # Validate only — no push from PRs.
-            skaffold build --tag="${SHORT_SHA}"
+            skaffold build -p ci --tag="${SHORT_SHA}"
           else
-            skaffold build --push \
-              --default-repo="${REGISTRY}" \
-              --tag="${SHORT_SHA}"
+            skaffold build -p ci --push --tag="${SHORT_SHA}"
             # Updater-facing names (digest-strategy Image Updaters watch
             # coelho-cloud-registry:5000). NOTE: Skaffold's buildx path pushes
             # without loading the image locally, so pull it back before

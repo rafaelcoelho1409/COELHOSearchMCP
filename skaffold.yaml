@@ -97,6 +97,26 @@ portForward:
 
 # NOTE: Ensure docker-buildx is installed when useBuildkit is true
 
+# -----------------------------------------------------------------------------
+# Profiles
+# -----------------------------------------------------------------------------
+# ci: Forgejo Actions image builds. Redefines the artifact with the
+#   updater-facing fully-qualified name so `skaffold build -p ci --push`
+#   lands at coelho-cloud-registry:5000/coelho-search-mcp-fastmcp (the repo
+#   ArgoCD Image Updater watches). Do NOT use --default-repo for this: with a
+#   fully-qualified base image name Skaffold flattens the old registry into
+#   the repo (localhost_5001_coelho-search-mcp-fastmcp) instead of replacing
+#   it. Dev loop (no profile) is untouched.
+profiles:
+  - name: ci
+    build:
+      artifacts:
+        - image: coelho-cloud-registry:5000/coelho-search-mcp-fastmcp
+          context: apps/fastmcp
+          docker:
+            dockerfile: Dockerfile.fastmcp
+            noCache: false
+
 # Development (Skaffold): ports 23030-23039
 # sh mirror_localhost_tailscale.sh $(for i in {23030..23034}; do echo $i; done)
 # skaffold dev --cache-artifacts=false --no-prune=false --auto-sync=false --auto-build=false
