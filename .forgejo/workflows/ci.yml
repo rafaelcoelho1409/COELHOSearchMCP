@@ -42,7 +42,6 @@ env:
   IMAGE: coelho-search-mcp-fastmcp
   SKAFFOLD_VERSION: v2.16.1 # keep in sync with local dev pin
   DOCKER_BUILDKIT: "1"
-
 jobs:
   build:
     name: skaffold build
@@ -66,6 +65,16 @@ jobs:
             echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           fi
           skaffold version
+
+      - name: Install Helm
+        # `skaffold build` shells out to helm (helm deployer configured in
+        # skaffold.yaml), and the act image ships none — old GitLab CI got it
+        # free inside gcr.io/k8s-skaffold/skaffold. Major-pinned v3 to match
+        # Skaffold v2.16.x; bump deliberately with Skaffold.
+        run: |
+          set -euo pipefail
+          curl -sSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm version --short
 
       - name: Wait for Docker (runner dind)
         run: |
