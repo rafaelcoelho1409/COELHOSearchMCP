@@ -103,7 +103,10 @@ jobs:
               --tag="${SHORT_SHA}"
             # Updater-facing names (digest-strategy Image Updaters watch
             # coelho-cloud-registry:5000). Same backing registry, so the
-            # second push is blob mounts, near-instant.
+            # second push is blob mounts, near-instant. NOTE: Skaffold's
+            # buildx path pushes without loading the image locally, so pull
+            # it back before retagging.
+            docker pull "${BUILT}:${SHORT_SHA}"
             docker tag "${BUILT}:${SHORT_SHA}" "${DEST}:${SHORT_SHA}"
             docker push "${DEST}:${SHORT_SHA}"
             # Floating tag so :latest watchers fire on every push; short-sha
